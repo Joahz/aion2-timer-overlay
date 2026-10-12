@@ -1,8 +1,11 @@
 name: Build Windows exe
 
+# Every push to main builds the exe and publishes it as the release for the
+# version in package.json. Bump "version" there to make a new release.
 on:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths-ignore: ['README.md']
   workflow_dispatch:
 
 permissions:
@@ -19,13 +22,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run dist
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions/upload-artifact@v4
+      - id: version
+        shell: bash
+        run: echo "tag=v$(node -p "require('./package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: softprops/action-gh-release@v2
         with:
-          name: Aion2TimerOverlay
-          path: dist/Aion2TimerOverlay.exe
-      - if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: Aion 2 Timer Overlay ${{ steps.version.outputs.tag }}
+          target_commitish: ${{ github.sha }}
+          make_latest: true
           files: dist/Aion2TimerOverlay.exe
+          body: |
+            Download **Aion2TimerOverlay.exe** below and double-click it. No install needed.
+
+            If Windows says "Windows protected your PC", click **More info → Run anyway** (the exe isn't code-signed).
+
+            Hotkeys: **Ctrl+Shift+L** lock (clicks pass through to the game), **Ctrl+Shift+H** hide/show.
