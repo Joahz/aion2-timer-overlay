@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Aion 2 Timers</title>
+<style>
+  :root {
+    --bg: rgba(14, 16, 22, 0.88);
+    --bg-solid: #0e1016;
+    --line: rgba(255, 255, 255, 0.08);
+    --text: #e8eaf0;
+    --muted: #8b93a3;
+    --accent: #e3bd6e;
+    --live: #57c98a;
+    --soon: #ff6b6b;
+    --opacity: 0.88;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body {
+    margin: 0;
+    font: 12px/1.35 "Segoe UI", system-ui, -apple-system, sans-serif;
+    color: var(--text);
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  /* Browser preview: a dim page behind the floating panel. Electron: fully transparent. */
+  body { background: #1a1d26; min-height: 100vh; overflow: hidden; }
+  body.electron { background: transparent; min-height: 0; }
+
+  .hint {
+    position: fixed; inset: auto 16px 16px 16px; color: #5d6577; font-size: 13px;
+    max-width: 520px;
+  }
+  body.electron .hint { display: none; }
+
+  #panel {
+    position: fixed; top: 24px; left: 24px; width: 300px;
+    background: rgba(14, 16, 22, var(--opacity));
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+    overflow: hidden;
+    backdrop-filter: blur(4px);
+  }
+  body.electron #panel {
+    position: static; width: 100%; border-radius: 8px; box-shadow: none;
+  }
+
+  header {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 6px 6px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid var(--line);
+    cursor: move;
+    -webkit-app-region: drag;
+  }
+  header .title { font-weight: 600; letter-spacing: 0.02em; flex: 1; white-space: nowrap; }
+  header .title b { color: var(--accent); }
+  header select, header button { -webkit-app-region: no-drag; }
+  select {
+    background: rgba(255, 255, 255, 0.06); color: var(--text);
+    border: 1px solid var(--line); border-radius: 4px; font: inherit; padding: 1px 2px;
+  }
+  select option { background: var(--bg-solid); }
+  .icon {
+    width: 22px; height: 22px; display: grid; place-items: center;
+    background: none; border: 0; color: var(--muted); border-radius: 4px; cursor: pointer;
+    font: 14px/1 inherit; padding: 0;
+  }
+  .icon:hover { background: rgba(255, 255, 255, 0.08); color: var(--text); }
+  .icon.on { color: var(--accent); }
+
+  #list { max-height: min(520px, calc(100vh - 80px)); overflow-y: auto; }
+  body.electron #list { max-height: 520px; }
+  .row {
+    display: grid; grid-template-columns: 4px 1fr auto; gap: 0 8px;
+    padding: 5px 10px 5px 0; border-bottom: 1px solid var(--line);
+    align-items: center;
+  }
+  .row:last-child { border-bottom: 0; }
+  .bar { align-self: stretch; border-radius: 0 2px 2px 0; }
+  .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sub { color: var(--muted); font-size: 11px; }
+  .cd { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+  .cd .sub { font-weight: 400; }
+  .row.live .cd .t { color: var(--live); }
+  .row.soon .cd .t { color: var(--soon); }
+  .tag {
+    font-size: 9px; font-weight: 700; letter-spacing: 0.06em; padding: 0 4px; border-radius: 3px;
+    background: var(--live); color: #08130d; margin-left: 4px; vertical-align: 1px;
+  }
+  .empty { padding: 14px 10px; color: var(--muted); text-align: center; }
+
+  #settings { display: none; padding: 8px 10px 10px; max-height: min(560px, calc(100vh - 80px)); overflow-y: auto; }
+  body.electron #settings { max-height: 560px; }
+  #panel.show-settings #settings { display: block; }
+  #panel.show-settings #list { display: none; }
+  .group { margin-bottom: 8px; }
+  .group h4 {
+    margin: 4px 0; font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted); display: flex; align-items: center; gap: 6px;
+  }
+  .group h4 .sw { width: 8px; height: 8px; border-radius: 2px; }
+  .group h4 button {
+    margin-left: auto; background: none; border: 0; color: var(--muted); cursor: pointer; font: inherit;
+    text-transform: none; letter-spacing: 0;
+  }
+  .group h4 button:hover { color: var(--text); }
+  label.ev { display: flex; align-items: center; gap: 6px; padding: 2px 0; cursor: pointer; }
+  label.ev .when { margin-left: auto; color: var(--muted); font-size: 11px; }
+  .opts { border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 6px; }
+  .opts .line { display: flex; align-items: center; gap: 6px; }
+  .opts input[type=range] { flex: 1; }
+  .keys { color: var(--muted); font-size: 11px; line-height: 1.5; }
+  .keys kbd {
+    font: inherit; background: rgba(255, 255, 255, 0.08); border-radius: 3px; padding: 0 3px; color: var(--text);
+  }
+  #panel.collapsed #list, #panel.collapsed #settings { display: none !important; }
+  #panel.locked header { cursor: default; }
+  .lockbadge { display: none; color: var(--accent); font-size: 11px; }
+  #panel.locked .lockbadge { display: inline; }
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+</style>
+</head>
+<body>
+<div class="hint">Browser preview — drag the panel by its title bar. Run the desktop app to float it over the game.</div>
+
+<div id="panel">
+  <header id="drag">
+    <span class="title"><b>AION 2</b> Timers <span class="lockbadge">· locked</span></span>
+    <select id="region" title="Server region"></select>
+    <button class="icon" id="btnAlert" title="Alerts on/off">🔔</button>
+    <button class="icon" id="btnSettings" title="Choose events">⚙</button>
+    <button class="icon" id="btnCollapse" title="Collapse">▾</button>
+    <button class="icon" id="btnClose" title="Close" hidden>✕</button>
+  </header>
+  <div id="list"></div>
+  <div id="settings"></div>
+</div>
+
+<script>
+// ---- Schedule data (mirrors gamers4.life/aion-2/database/en/events/) -------
+// All times are in the region's server clock. Global regions use fixed offsets,
+// exactly like the source site; TW/KR run a different schedule.
+const REGIONS = {
+  na:  { label: 'NA East', offsetMin: -240, family: 'global' },
+  naw: { label: 'NA West', offsetMin: -420, family: 'global' },
+  eu:  { label: 'EU',      offsetMin: 120,  family: 'global' },
+  sa:  { label: 'SA',      offsetMin: -180, family: 'global' },
+  jp:  { label: 'JP',      offsetMin: 540,  family: 'global' },
+  tw:  { label: 'TW',      offsetMin: 480,  family: 'nc' },
+  kr:  { label: 'KR',      offsetMin: 540,  family: 'nc' },
+};
+
+const CATEGORIES = {
+  rift:  { label: 'Rifts',        color: '#e3bd6e' },
+  event: { label: 'Events',       color: '#57c98a' },
+  boss:  { label: 'World Bosses', color: '#e0708a' },
+  abyss: { label: 'Abyss',        color: '#ff6b6b' },
+};
+
+// "07:00" UTC expressed in a region's server clock.
+function utcToServer(hhmm, offsetMin) {
+  const [h, m] = hhmm.split(':').map(Number);
+  const t = (((h * 60 + m + offsetMin) % 1440) + 1440) % 1440;
+  return String(Math.floor(t / 60)).padStart(2, '0') + ':' + String(t % 60).padStart(2, '0');
+}
+
+const shared = (kairaEvery) => [
+  { id: 'rift', name: 'Spacetime Rift', cat: 'rift', schedule: { type: 'interval', everyMin: 180, anchor: '02:00' }, durationMin: 60 },
+  { id: 'shugo-festival', name: 'Shugo Festival', cat: 'event', schedule: { type: 'hourly', minute: 0 }, durationMin: 10 },
+  { id: 'beritra', name: 'Dimensional Invasion', cat: 'event', schedule: { type: 'hourly', minute: 30 }, durationMin: 13 },
+  { id: 'boss-watcher-kaira', name: 'Watcher Kaira', cat: 'boss', schedule: { type: 'interval', everyMin: kairaEvery, anchor: '01:00' }, durationMin: 15 },
+];
+const executors = (days, time) => ['Tamasa', 'Argo', 'Kaira'].map((n) => ({
+  id: 'boss-executor-' + n.toLowerCase(), name: 'Executor ' + n, cat: 'boss',
+  schedule: { type: 'weekday', days, time }, durationMin: 30,
+}));
+
+function globalSchedule(offsetMin) {
+  return [
+    ...shared(180),
+    { id: 'artifact-siege', name: 'Artifact Siege', cat: 'abyss', schedule: { type: 'weekday', days: [1, 4, 6], time: '21:00' }, durationMin: 30 },
+    ...executors([1, 4, 6], '21:30'),
+    { id: 'boss-nahma', name: 'Guardian Lord Nahma', cat: 'boss', schedule: { type: 'weekday', days: [0, 5], time: '21:00' }, durationMin: 30 },
+    { id: 'boss-enraged-nahma', name: 'Enraged Guardian Lord Nahma', cat: 'boss', schedule: { type: 'weekday', days: [0, 5], time: '21:00' }, durationMin: 30 },
+    { id: 'arena-of-tactics', name: 'Arena of Tactics', cat: 'event', schedule: { type: 'daily', times: ['11:00', '19:00'] } },
+    { id: 'daily-reset', name: 'Daily Reset', cat: 'event', schedule: { type: 'daily', times: [utcToServer('07:00', offsetMin)] } },
+    { id: 'weekly-reset', name: 'Weekly Reset', cat: 'event', schedule: { type: 'weekday', days: [3], time: utcToServer('07:00', offsetMin) } },
+  ];
+}
+
+const NC_SCHEDULE = [
+  ...shared(240),
+  { id: 'artifact-siege', name: 'Artifact Siege', cat: 'abyss', schedule: { type: 'weekday', days: [3, 6], time: '21:20' }, durationMin: 30 },
+  ...executors([3, 6], '22:30'),
+  { id: 'boss-nahma', name: 'Guardian Lord Nahma', cat: 'boss', schedule: { type: 'weekday', days: [0, 5], time: '22:00' }, durationMin: 30 },
+  { id: 'boss-enraged-nahma', name: 'Enraged Guardian Lord Nahma', cat: 'boss', schedule: { type: 'weekday', days: [0, 5], time: '22:00' }, durationMin: 30 },
+  ...['Executioner Dramos', 'Turncoat Ducal', 'Ravager Marakha'].map((name) => ({
+    id: 'boss-' + name.split(' ')[1].toLowerCase(), name, cat: 'boss',
+    schedule: { type: 'weekday', days: [3, 6], time: '22:30' }, durationMin: 30,
+  })),
+];
+
+function scheduleFor(regionId) {
+  const r = REGIONS[regionId];
+  return r.family === 'nc' ? NC_SCHEDULE : globalSchedule(r.offsetMin);
+}
+
+// ---- Time maths ------------------------------------------------------------
+const MIN = 60e3, HOUR = 36e5, DAY = 864e5;
+const hhmmMs = (s) => { const [h, m] = s.split(':').map(Number); return (h * 60 + (m || 0)) * MIN; };
+
+// Candidate start times, as "server-clock epoch" ms (UTC fields read as server time).
+function candidates(ev, serverNow) {
+  const s = ev.schedule;
+  const d = new Date(serverNow);
+  const day0 = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate());
+  const out = [];
+  if (s.type === 'interval') {
+    const step = s.everyMin * MIN;
+    for (let t = day0 + hhmmMs(s.anchor) - DAY; t <= serverNow + step + DAY; t += step) out.push(t);
+  } else if (s.type === 'hourly') {
+    for (let h = -1; h <= 25; h++) out.push(day0 + h * HOUR + s.minute * MIN);
+  } else if (s.type === 'daily') {
+    for (let i = -1; i <= 8; i++) for (const t of s.times) out.push(day0 + i * DAY + hhmmMs(t));
+  } else {
+    for (let i = -1; i <= 14; i++) {
+      const t = day0 + i * DAY;
+      if (s.days.includes(new Date(t).getUTCDay())) out.push(t + hhmmMs(s.time));
+    }
+  }
+  return out.sort((a, b) => a - b);
+}
+
+// Returns { next, last } as real epoch ms.
+function timesFor(ev, now, offsetMin) {
+  const off = offsetMin * MIN, sNow = now + off;
+  let last = 0, next = 0;
+  for (const t of candidates(ev, sNow)) {
+    if (t <= sNow) last = t; else { next = t; break; }
+  }
+  return { next: next ? next - off : 0, last: last ? last - off : 0 };
+}
+
+function fmtDur(ms) {
+  if (ms <= 0) return 'now';
+  const s = Math.floor(ms / 1000);
+  const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), sec = s % 60;
+  if (d > 0) return `${d}d ${h}h`;
+  if (h > 0) return `${h}h ${String(m).padStart(2, '0')}m`;
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+const timeFmt = new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' });
+const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', hour: '2-digit', minute: '2-digit' });
+function fmtLocal(ts) {
+  const sameDay = new Date(ts).toDateString() === new Date().toDateString();
+  return (sameDay ? timeFmt : dayFmt).format(ts);
+}
+function describe(s) {
+  const DN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  if (s.type === 'interval') return `every ${s.everyMin / 60}h from ${s.anchor}`;
+  if (s.type === 'hourly') return `hourly at :${String(s.minute).padStart(2, '0')}`;
+  if (s.type === 'daily') return `daily ${s.times.join(', ')}`;
+  return `${s.days.map((d) => DN[d]).join('/')} ${s.time}`;
+}
+
+// ---- Settings --------------------------------------------------------------
+const STORE = 'aion2-overlay-v1';
+const defaults = {
+  region: guessRegion(),
+  hidden: [],            // event ids the user switched off
+  alerts: false,
+  leadMin: 5,
+  opacity: 0.88,
+  maxRows: 0,            // 0 = show all enabled
+  width: 300,
+  collapsed: false,
+  pos: { x: 24, y: 24 }, // browser preview only
+};
+let cfg = load();
+function load() {
+  try { return { ...defaults, ...JSON.parse(localStorage.getItem(STORE) || '{}') }; } catch { return { ...defaults }; }
+}
+function save() { try { localStorage.setItem(STORE, JSON.stringify(cfg)); } catch {} }
+function guessRegion() {
+  try {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (/^Asia\/(Seoul|Pyongyang)/.test(tz)) return 'kr';
+    if (/^Asia\/Taipei/.test(tz)) return 'tw';
+    if (/^Asia\/Tokyo/.test(tz)) return 'jp';
+    if (/^America\/(Sao_Paulo|Argentina|Buenos_Aires|Santiago|Montevideo|Bogota|Lima|Caracas)/.test(tz)) return 'sa';
+    if (/^America\/(Los_Angeles|Vancouver|Tijuana|Phoenix|Denver|Boise|Edmonton|Anchorage)/.test(tz)) return 'naw';
+    if (/^(America|US|Canada)\//.test(tz)) return 'na';
+    if (/^(Europe|Africa|Atlantic)\//.test(tz)) return 'eu';
+  } catch {}
+  return 'na';
+}
+
+// ---- UI --------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+const panel = $('panel'), list = $('list'), settingsEl = $('settings');
+const bridge = window.overlay; // present only inside the Electron app
+if (bridge) { document.body.classList.add('electron'); $('btnClose').hidden = false; }
+
+for (const [id, r] of Object.entries(REGIONS)) $('region').add(new Option(r.label, id));
+$('region').value = cfg.region;
+$('region').onchange = (e) => { cfg.region = e.target.value; save(); renderSettings(); tick(); };
+
+$('btnSettings').onclick = () => { panel.classList.toggle('show-settings'); cfg.collapsed = false; applyCollapse(); renderSettings(); fit(); };
+$('btnCollapse').onclick = () => { cfg.collapsed = !cfg.collapsed; save(); applyCollapse(); fit(); };
+$('btnAlert').onclick = async () => {
+  cfg.alerts = !cfg.alerts;
+  if (cfg.alerts && 'Notification' in window && Notification.permission === 'default') {
+    try { await Notification.requestPermission(); } catch {}
+  }
+  if (cfg.alerts) beep();
+  save(); applyAlertIcon();
+};
+$('btnClose').onclick = () => bridge && bridge.close();
+
+function applyCollapse() {
+  panel.classList.toggle('collapsed', cfg.collapsed);
+  $('btnCollapse').textContent = cfg.collapsed ? '▸' : '▾';
+}
+function applyAlertIcon() {
+  $('btnAlert').classList.toggle('on', cfg.alerts);
+  $('btnAlert').textContent = cfg.alerts ? '🔔' : '🔕';
+}
+function applyWidth() {
+  if (bridge) { lastH = 0; fit(); } else panel.style.width = cfg.width + 'px';
+}
+function applyOpacity() { document.documentElement.style.setProperty('--opacity', cfg.opacity); }
+
+function renderSettings() {
+  if (!panel.classList.contains('show-settings')) return;
+  const evs = scheduleFor(cfg.region);
+  const hidden = new Set(cfg.hidden);
+  let html = '';
+  for (const [cat, meta] of Object.entries(CATEGORIES)) {
+    const inCat = evs.filter((e) => e.cat === cat);
+    if (!inCat.length) continue;
+    const allOn = inCat.every((e) => !hidden.has(e.id));
+    html += `<div class="group"><h4><span class="sw" style="background:${meta.color}"></span>${meta.label}
+      <button data-cat="${cat}" data-on="${allOn ? 0 : 1}">${allOn ? 'hide all' : 'show all'}</button></h4>`;
+    for (const e of inCat) {
+      html += `<label class="ev"><input type="checkbox" data-id="${e.id}" ${hidden.has(e.id) ? '' : 'checked'}>
+        <span>${e.name}</span><span class="when">${describe(e.schedule)}</span></label>`;
+    }
+    html += '</div>';
+  }
+  html += `<div class="opts">
+    <div class="line">Opacity <input type="range" id="opOpacity" min="0.3" max="1" step="0.02" value="${cfg.opacity}"></div>
+    <div class="line">Alert <select id="opLead">${[1, 3, 5, 10, 15].map((m) => `<option ${m === cfg.leadMin ? 'selected' : ''}>${m}</option>`).join('')}</select> min before start
+      <button class="icon" id="opTest" title="Test sound">▶</button></div>
+    <div class="line">Width <select id="opWidth">${[240, 270, 300, 340, 400].map((n) => `<option ${n === cfg.width ? 'selected' : ''}>${n}</option>`).join('')}</select> px</div>
+    <div class="line">Show <select id="opRows">${[0, 3, 5, 8, 10].map((n) => `<option value="${n}" ${n === cfg.maxRows ? 'selected' : ''}>${n || 'all'}</option>`).join('')}</select> upcoming rows</div>
+    ${bridge ? `<div class="keys"><kbd>Ctrl+Shift+L</kbd> lock / click-through &nbsp; <kbd>Ctrl+Shift+H</kbd> hide / show</div>` : ''}
+    <div class="keys">Schedule converted from server time (${REGIONS[cfg.region].label}) to your clock.</div>
+  </div>`;
+  settingsEl.innerHTML = html;
+
+  settingsEl.querySelectorAll('input[data-id]').forEach((cb) => cb.onchange = () => {
+    const set = new Set(cfg.hidden);
+    cb.checked ? set.delete(cb.dataset.id) : set.add(cb.dataset.id);
+    cfg.hidden = [...set]; save(); renderSettings(); tick();
+  });
+  settingsEl.querySelectorAll('button[data-cat]').forEach((b) => b.onclick = () => {
+    const ids = evs.filter((e) => e.cat === b.dataset.cat).map((e) => e.id);
+    const set = new Set(cfg.hidden);
+    const turnOn = b.dataset.on === '1';
+    ids.forEach((id) => turnOn ? set.delete(id) : set.add(id));
+    cfg.hidden = [...set]; save(); renderSettings(); tick();
+  });
+  $('opOpacity').oninput = (e) => { cfg.opacity = +e.target.value; applyOpacity(); save(); };
+  $('opLead').onchange = (e) => { cfg.leadMin = +e.target.value; save(); };
+  $('opWidth').onchange = (e) => { cfg.width = +e.target.value; save(); applyWidth(); };
+  $('opRows').onchange = (e) => { cfg.maxRows = +e.target.value; save(); tick(); };
+  $('opTest').onclick = beep;
+}
+
+// Alerts: fire once per (event, start time).
+const fired = new Set();
+function maybeAlert(ev, next, now) {
+  if (!cfg.alerts || !next) return;
+  const left = next - now;
+  const key = ev.id + '@' + next;
+  if (left > 0 && left <= cfg.leadMin * MIN && !fired.has(key)) {
+    fired.add(key);
+    beep();
+    const body = `${ev.name} starts in ${Math.ceil(left / MIN)} min (${fmtLocal(next)})`;
+    if (bridge) bridge.notify('Aion 2', body);
+    else if ('Notification' in window && Notification.permission === 'granted') new Notification('Aion 2', { body });
+  }
+}
+let audio;
+function beep() {
+  try {
+    audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+    const t = audio.currentTime;
+    [880, 1175].forEach((f, i) => {
+      const o = audio.createOscillator(), g = audio.createGain();
+      o.frequency.value = f; o.type = 'sine';
+      g.gain.setValueAtTime(0.0001, t + i * 0.18);
+      g.gain.exponentialRampToValueAtTime(0.25, t + i * 0.18 + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.18 + 0.16);
+      o.connect(g).connect(audio.destination);
+      o.start(t + i * 0.18); o.stop(t + i * 0.18 + 0.17);
+    });
+  } catch {}
+}
+
+const esc = (s) => s.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function tick() {
+  const now = Date.now();
+  const off = REGIONS[cfg.region].offsetMin;
+  const hidden = new Set(cfg.hidden);
+  const rows = scheduleFor(cfg.region)
+    .filter((e) => !hidden.has(e.id))
+    .map((ev) => {
+      const { next, last } = timesFor(ev, now, off);
+      const live = ev.durationMin && last && now - last < ev.durationMin * MIN;
+      maybeAlert(ev, next, now);
+      return { ev, next, last, live, sortKey: live ? 0 : next };
+    })
+    .sort((a, b) => a.sortKey - b.sortKey);
+  const shown = cfg.maxRows ? rows.slice(0, cfg.maxRows) : rows;
+
+  if (!shown.length) {
+    list.innerHTML = '<div class="empty">No events selected — open ⚙ to pick some.</div>';
+  } else {
+    list.innerHTML = shown.map(({ ev, next, last, live }) => {
+      const color = CATEGORIES[ev.cat].color;
+      let t, sub;
+      if (live) {
+        t = fmtDur(last + ev.durationMin * MIN - now) + ' left';
+        sub = 'next ' + fmtLocal(next);
+      } else {
+        t = fmtDur(next - now);
+        sub = fmtLocal(next);
+      }
+      const soon = !live && next - now <= cfg.leadMin * MIN;
+      return `<div class="row ${live ? 'live' : ''} ${soon ? 'soon' : ''}">
+        <span class="bar" style="background:${color}"></span>
+        <div><div class="name">${esc(ev.name)}${live ? '<span class="tag">LIVE</span>' : ''}</div>
+          <div class="sub">${CATEGORIES[ev.cat].label}</div></div>
+        <div class="cd"><div class="t">${t}</div><div class="sub">${sub}</div></div>
+      </div>`;
+    }).join('');
+  }
+  fit();
+}
+
+// Electron: size the window to the panel. Browser: drag the panel around the page.
+let lastH = 0;
+function fit() {
+  if (!bridge) return;
+  const h = Math.ceil(panel.getBoundingClientRect().height);
+  if (h !== lastH) { lastH = h; bridge.resize(h, cfg.width); }
+}
+
+function enableBrowserDrag() {
+  const place = () => {
+    const maxX = window.innerWidth - panel.offsetWidth, maxY = window.innerHeight - 40;
+    cfg.pos.x = Math.max(0, Math.min(maxX, cfg.pos.x));
+    cfg.pos.y = Math.max(0, Math.min(maxY, cfg.pos.y));
+    panel.style.left = cfg.pos.x + 'px'; panel.style.top = cfg.pos.y + 'px';
+  };
+  place();
+  window.addEventListener('resize', place);
+  const head = $('drag');
+  head.addEventListener('pointerdown', (e) => {
+    if (e.target.closest('button, select')) return;
+    const sx = e.clientX - cfg.pos.x, sy = e.clientY - cfg.pos.y;
+    head.setPointerCapture(e.pointerId);
+    const move = (m) => { cfg.pos.x = m.clientX - sx; cfg.pos.y = m.clientY - sy; place(); };
+    const up = () => { head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up); save(); };
+    head.addEventListener('pointermove', move);
+    head.addEventListener('pointerup', up);
+  });
+}
+
+if (bridge) bridge.onLock((locked) => panel.classList.toggle('locked', locked));
+else enableBrowserDrag();
+
+applyCollapse(); applyAlertIcon(); applyOpacity(); applyWidth();
+tick();
+setInterval(tick, 1000);
+</script>
+</body>
+</html>
