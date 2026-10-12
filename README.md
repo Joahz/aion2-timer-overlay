@@ -58,6 +58,7 @@ server time. If the game changes a time, edit it there.
 
 ## Sharing a new version
 
-Push a tag (for example `git tag v1.0.1 && git push --tags`). GitHub Actions
-builds the exe on Windows and attaches it to a new release on the
-**Releases** page. People you've added to the repo can download it there.
+Change `"version"` in `package.json` (for example to `1.0.1`) and push to
+`main`. GitHub Actions builds the exe on Windows and publishes it on the
+**Releases** page as `v1.0.1`. People you've added to the repo can download it
+there.
