@@ -7,6 +7,31 @@ can drag it anywhere, and you choose which events it shows.
 The schedule matches https://gamers4.life/aion-2/database/en/events/ and is
 built in, so the overlay works offline.
 
+## Can this get me banned?
+
+It's very unlikely. The overlay doesn't interact with the game in any way that
+anti-cheat looks for. It is a normal window set to stay on top, the same as a
+sticky-note app or a browser window pinned over the game.
+
+**What it never does:**
+- read or change the game's memory or files
+- inject anything into the game (it doesn't hook in the way the Discord or Steam overlays do)
+- read the game's network traffic
+- press keys or click for you
+
+All it does is check your PC's clock and count down to schedule times written
+into the app. The two hotkeys (Ctrl+Shift+L and Ctrl+Shift+H) are registered
+the normal Windows way, the same way Discord or OBS register theirs, and they
+only control the overlay's own window.
+
+What gets players banned is tools that reach into the game: memory readers,
+packet sniffers (some DPS meters work this way), bots, macros that press keys
+automatically, and speed or teleport hacks. This overlay does none of those.
+
+Only NCSOFT decides what its anti-cheat flags, so nobody can promise 100%.
+For zero doubt, open `index.html` in a browser instead of running the exe:
+it's then just a web page, but it won't stay on top of the game.
+
 ## Run it (Windows)
 
 Double-click **`Aion2TimerOverlay.exe`**. You don't need to install anything.
