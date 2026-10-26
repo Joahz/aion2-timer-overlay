@@ -11,7 +11,8 @@
     "electron": "33.2.1",
     "electron-builder": "25.1.8"
   },
-  "author": "Aion 2 Timer Overlay",
+  "author": "Joshua Slocum",
+  "license": "MIT",
   "build": {
     "appId": "life.aion2.timeroverlay",
     "productName": "Aion 2 Timer Overlay",

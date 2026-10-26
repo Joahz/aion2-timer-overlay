@@ -7,6 +7,10 @@ can drag it anywhere, and you choose which events it shows.
 The schedule matches https://gamers4.life/aion-2/database/en/events/ and is
 built in, so the overlay works offline.
 
+[![Buy me a coffee](https://img.shields.io/badge/Buy%20me%20a%20coffee-FFDD00?style=for-the-badge&logo=buymeacoffee&logoColor=black)](https://buymeacoffee.com/slokey)
+
+This overlay is free. If it helps you, you can [buy me a coffee](https://buymeacoffee.com/slokey) ☕
+
 ## Can this get me banned?
 
 It's very unlikely. The overlay doesn't interact with the game in any way that
@@ -85,5 +89,12 @@ server time. If the game changes a time, edit it there.
 
 Change `"version"` in `package.json` (for example to `1.0.1`) and push to
 `main`. GitHub Actions builds the exe on Windows and publishes it on the
-**Releases** page as `v1.0.1`. People you've added to the repo can download it
-there.
+**Releases** page as `v1.0.1`, where anyone can download it.
+
+## Support
+
+This overlay is free. If it saves you a missed rift or boss, you can [buy me a coffee](https://buymeacoffee.com/slokey) ☕
+
+## License
+
+MIT. See [LICENSE](LICENSE).
