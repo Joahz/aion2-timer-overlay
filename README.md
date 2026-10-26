@@ -1,5 +1,7 @@
 # Aion 2 Timer Overlay
 
+<p align="center"><img src="docs/banner.png" alt="Aion 2 Timer Overlay: live countdowns for rifts, world bosses, Abyss and events" width="100%"></p>
+
 A small floating panel, like NOT METER's, with live countdowns for Aion 2
 rifts, world bosses, Abyss and timed events. It stays on top of the game, you
 can drag it anywhere, and you choose which events it shows.
